@@ -14,12 +14,19 @@ import fitz
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 
-INVOICE_PATTERNS = [
-    re.compile(r"发票号码\s*[：:]\s*(\d{8}|\d{20})"),
-    re.compile(r"发票号码\s+(\d{8}|\d{20})"),
-    re.compile(r"(?<![0-9])(\d{20})(?![0-9])"),
-    re.compile(r"(?<![0-9])(\d{8})(?![0-9])"),
+_VALID_INVOICE_LENGTHS = frozenset({8, 20})
+
+_LABELED_PATTERNS = [
+    re.compile(r"发票号码\s*[：:]\s*(\d{20})"),
+    re.compile(r"发票号码\s*[：:]\s*(\d{8})"),
+    re.compile(r"发票号码\s*[：:]\s*(\d+)"),
+    re.compile(r"发票号码\s*[：:]\s*\n\s*(\d{20}|\d{8})"),
+    re.compile(r"发票号码\s+(\d{20})"),
+    re.compile(r"发票号码\s+(\d{8})"),
+    re.compile(r"发票号码\s+(\d+)"),
 ]
+
+_FALLBACK_20_DIGIT = re.compile(r"(?<![0-9])(\d{20})(?![0-9])")
 
 MSG_NOT_RECOGNIZED = "未能识别"
 MSG_FILE_ERROR = "文件异常"
@@ -35,11 +42,23 @@ def collect_pdf_paths(pdf_dir: Path) -> list[Path]:
     return sorted(seen.values(), key=lambda p: p.name.lower())
 
 
+def _accept_invoice_digits(digits: str) -> str | None:
+    if len(digits) in _VALID_INVOICE_LENGTHS:
+        return digits
+    return None
+
+
 def extract_invoice_number(text: str) -> str | None:
-    for pattern in INVOICE_PATTERNS:
+    for pattern in _LABELED_PATTERNS:
         match = pattern.search(text)
         if match:
-            return match.group(1)
+            accepted = _accept_invoice_digits(match.group(1))
+            if accepted:
+                return accepted
+
+    match = _FALLBACK_20_DIGIT.search(text)
+    if match:
+        return match.group(1)
     return None
 
 
