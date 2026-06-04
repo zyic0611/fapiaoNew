@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+.venv/
+.venv-sys/
+_test_pdfs/
+_test_out/
+build/
+dist/
+*.spec
